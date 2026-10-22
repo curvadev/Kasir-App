@@ -1,9 +1,13 @@
-name: Build & Sign Android KasirQu
+name: Build & Sign Android KasirQu (APK & AAB)
 
 on:
   push:
     branches: [ "main", "master" ]
   workflow_dispatch: 
+
+# Izin agar server GitHub boleh menyimpan file kunci (.jks) ke repositori Anda
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -23,20 +27,41 @@ jobs:
     - name: Buka Izin Eksekusi Gradlew
       run: chmod +x gradlew
 
-    - name: Buat Kunci Tanda Tangan (Keystore) Otomatis
+    - name: Otomatis Buat & Simpan Keystore Permanen ke GitHub
       run: |
-        keytool -genkey -v -keystore kasirqu.jks -alias kasir_key -keyalg RSA -keysize 2048 -validity 10000 -storepass kasirqu123 -keypass kasirqu123 -dname "CN=KasirQu, O=Kasir Pintar, C=ID"
+        if [ ! -f kasirqu.jks ]; then
+          echo "Kunci permanen belum ada. Membuat kunci baru dan menyimpan ke GitHub..."
+          keytool -genkey -v -keystore kasirqu.jks -alias kasir_key -keyalg RSA -keysize 2048 -validity 10000 -storepass kasirqu123 -keypass kasirqu123 -dname "CN=KasirQu, O=Kasir Pintar, C=ID"
+          
+          # Menyuruh bot GitHub menyimpan file .jks ini ke dalam repositori Anda selamanya
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add kasirqu.jks
+          git commit -m "Otomatis menyimpan kunci permanen (Keystore) [skip ci]"
+          git push
+        else
+          echo "Kunci permanen sudah ada! Melanjutkan proses update aplikasi..."
+        fi
 
-    - name: Rakit APK Versi Release
-      run: ./gradlew assembleRelease
+    - name: Rakit APK & AAB Versi Release
+      # Menjalankan perintah rakit APK (assembleRelease) dan AAB (bundleRelease) secara bersamaan
+      run: ./gradlew assembleRelease bundleRelease
 
-    - name: Beri Tanda Tangan (Sign) APK
+    - name: Beri Tanda Tangan (Sign) pada file APK
       run: |
         BUILD_TOOLS=$(ls -1d $ANDROID_HOME/build-tools/* | tail -n 1)
-        $BUILD_TOOLS/apksigner sign --ks kasirqu.jks --ks-pass pass:kasirqu123 --key-pass pass:kasirqu123 --out KasirQu-Siap-Install.apk app/build/outputs/apk/release/app-release-unsigned.apk
+        $BUILD_TOOLS/apksigner sign --ks kasirqu.jks --ks-pass pass:kasirqu123 --key-pass pass:kasirqu123 --out KasirQu-Final.apk app/build/outputs/apk/release/app-release-unsigned.apk
 
-    - name: Simpan Hasil Akhir APK
+    - name: Beri Tanda Tangan (Sign) pada file AAB
+      # Format AAB harus ditandatangani menggunakan jarsigner bawaan Java
+      run: |
+        jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore kasirqu.jks -storepass kasirqu123 -keypass kasirqu123 app/build/outputs/bundle/release/app-release.aab kasir_key
+        cp app/build/outputs/bundle/release/app-release.aab KasirQu-Final.aab
+
+    - name: Simpan Hasil Akhir (APK & AAB)
       uses: actions/upload-artifact@v4
       with:
-        name: KasirQu-Release-APK
-        path: KasirQu-Siap-Install.apk
+        name: KasirQu-Release-Files
+        path: |
+          KasirQu-Final.apk
+          KasirQu-Final.aab
