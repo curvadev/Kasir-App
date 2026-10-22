@@ -83,12 +83,12 @@ public class MainActivity extends AppCompatActivity {
                 FrameLayout.LayoutParams.MATCH_PARENT, 
                 FrameLayout.LayoutParams.MATCH_PARENT));
 
-        // 3. MENAMBAHKAN SPLASH SCREEN DI LAPISAN PALING ATAS
+        // 3. TAMBAHKAN LAYOUT SPLASH SCREEN DI ATAS WEBVIEW
         RelativeLayout splashLayout = new RelativeLayout(this);
-        splashLayout.setBackgroundColor(Color.parseColor("#ffffff")); // Latar belakang putih
+        splashLayout.setBackgroundColor(Color.parseColor("#ffffff"));
 
         ImageView splashImage = new ImageView(this);
-        splashImage.setImageResource(R.drawable.splash_logo); // Memanggil gambar splash_logo.png
+        splashImage.setImageResource(R.drawable.splash_logo);
         splashImage.setAdjustViewBounds(true);
 
         RelativeLayout.LayoutParams imgParams = new RelativeLayout.LayoutParams(
@@ -96,21 +96,19 @@ public class MainActivity extends AppCompatActivity {
                 RelativeLayout.LayoutParams.WRAP_CONTENT
         );
         imgParams.addRule(RelativeLayout.CENTER_IN_PARENT);
-        // Margin agar logo lebar 1024 tidak mentok di layar HP
         int margin = (int) (32 * getResources().getDisplayMetrics().density);
         imgParams.setMargins(margin, 0, margin, 0);
         splashImage.setLayoutParams(imgParams);
 
         splashLayout.addView(splashImage);
 
-        // Pasang splash screen ke lapisan paling atas menutupi WebView
         root.addView(splashLayout, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, 
                 FrameLayout.LayoutParams.MATCH_PARENT));
 
         setContentView(root);
 
-        // Logika untuk menghilangkan Splash Screen secara perlahan setelah 2.5 detik
+        // HILANGKAN SPLASH SCREEN SETELAH 2.5 DETIK
         new Handler().postDelayed(new Runnable() {
             @Override
             public void run() {
@@ -126,6 +124,15 @@ public class MainActivity extends AppCompatActivity {
         // 4. MINTA IZIN KAMERA & BLUETOOTH
         cekDanMintaIzin();
 
+        // =======================================================
+        // PERBAIKAN: MEMATIKAN AUTOFILL (SARAN GOOGLE PASSWORD)
+        // =======================================================
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Memaksa sistem operasi Android untuk TIDAK memindai halaman ini mencari kolom password
+            webView.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+        }
+        // =======================================================
+
         // 5. PENGATURAN WEBVIEW
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
@@ -134,6 +141,9 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setAllowFileAccess(true);
         webSettings.setLoadsImagesAutomatically(true);
         webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        
+        // Mematikan penyimpanan form data bawaan WebView lama
+        webSettings.setSaveFormData(false);
 
         CookieManager.getInstance().setAcceptCookie(true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -304,7 +314,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // PROSES EKSEKUSI BLUETOOTH PRINTER & DECODE LOGO
     private void kirimKePrinterBluetooth(final String dataDikirim) {
         final BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         if (bluetoothAdapter == null) {
@@ -345,14 +354,12 @@ public class MainActivity extends AppCompatActivity {
                         Bitmap originalBitmap = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length);
                         
                         if (originalBitmap != null) {
-                            // 1. UKURAN IDEAL (240px)
                             int targetWidth = 240; 
                             targetWidth = (targetWidth / 8) * 8; 
                             int targetHeight = (int) (originalBitmap.getHeight() * ((float) targetWidth / originalBitmap.getWidth()));
                             
                             Bitmap scaledBitmap = Bitmap.createScaledBitmap(originalBitmap, targetWidth, targetHeight, true);
                             
-                            // 2. KANVAS PUTIH (Mencegah PNG transparan jadi hitam ngeblok)
                             Bitmap whiteBgBitmap = Bitmap.createBitmap(scaledBitmap.getWidth(), scaledBitmap.getHeight(), Bitmap.Config.ARGB_8888);
                             Canvas canvas = new Canvas(whiteBgBitmap);
                             canvas.drawColor(Color.WHITE); 
@@ -419,7 +426,6 @@ public class MainActivity extends AppCompatActivity {
         }).start();
     }
 
-    // FUNGSI KONVERSI GAMBAR (BITMAP) KE ESC/POS
     private byte[] decodeBitmapToEscPos(Bitmap bmp) {
         int width = bmp.getWidth();
         int height = bmp.getHeight();
@@ -438,7 +444,6 @@ public class MainActivity extends AppCompatActivity {
                         int pixel = bmp.getPixel(x + k, y);
                         if (Color.alpha(pixel) < 128) continue; 
                         
-                        // 3. BATAS KECERAHAN IDEAL (Mencegah bayangan transparan ikut dicetak hitam)
                         int luminance = (int) (Color.red(pixel) * 0.299 + Color.green(pixel) * 0.587 + Color.blue(pixel) * 0.114);
                         if (luminance < 200) { 
                             b |= (1 << (7 - k));
