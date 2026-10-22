@@ -1,0 +1,42 @@
+name: Build & Sign Android KasirQu
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch: 
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup Java JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Buka Izin Eksekusi Gradlew
+      run: chmod +x gradlew
+
+    - name: Buat Kunci Tanda Tangan (Keystore) Otomatis
+      run: |
+        keytool -genkey -v -keystore kasirqu.jks -alias kasir_key -keyalg RSA -keysize 2048 -validity 10000 -storepass kasirqu123 -keypass kasirqu123 -dname "CN=KasirQu, O=Kasir Pintar, C=ID"
+
+    - name: Rakit APK Versi Release
+      run: ./gradlew assembleRelease
+
+    - name: Beri Tanda Tangan (Sign) APK
+      run: |
+        BUILD_TOOLS=$(ls -1d $ANDROID_HOME/build-tools/* | tail -n 1)
+        $BUILD_TOOLS/apksigner sign --ks kasirqu.jks --ks-pass pass:kasirqu123 --key-pass pass:kasirqu123 --out KasirQu-Siap-Install.apk app/build/outputs/apk/release/app-release-unsigned.apk
+
+    - name: Simpan Hasil Akhir APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: KasirQu-Release-APK
+        path: KasirQu-Siap-Install.apk
