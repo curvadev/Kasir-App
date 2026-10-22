@@ -124,18 +124,12 @@ public class MainActivity extends AppCompatActivity {
         // 4. MINTA IZIN KAMERA & BLUETOOTH
         cekDanMintaIzin();
 
-        // =========================================================================
-        // TRIK MUTLAK: MEMATIKAN GOOGLE PASSWORD MANAGER (AUTOFILL)
-        // =========================================================================
+        // MATIKAN GOOGLE PASSWORD MANAGER (AUTOFILL)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Melarang Android melakukan scanning Autofill pada seluruh layar dan WebView
             getWindow().getDecorView().setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS);
             webView.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS);
         }
-        // Bersihkan cache dan data form yang mungkin tertinggal
         webView.clearFormData();
-        webView.clearCache(true);
-        // =========================================================================
 
         // 5. PENGATURAN WEBVIEW
         WebSettings webSettings = webView.getSettings();
@@ -146,7 +140,6 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setLoadsImagesAutomatically(true);
         webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         
-        // Mematikan penyimpanan form data & password bawaan WebView
         webSettings.setSaveFormData(false);
         webSettings.setSavePassword(false);
 
@@ -175,6 +168,17 @@ public class MainActivity extends AppCompatActivity {
                     return true;
                 }
                 return false;
+            }
+
+            // ================================================================
+            // SOLUSI LOGIN PERMANEN: PAKSA SIMPAN COOKIE KE MEMORI INTERNAL
+            // ================================================================
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    CookieManager.getInstance().flush(); // Simpan sesi secara fisik
+                }
             }
         });
 
@@ -225,6 +229,17 @@ public class MainActivity extends AppCompatActivity {
         });
 
         webView.loadUrl("https://curva.web.id/kasir-app/");
+    }
+
+    // ================================================================
+    // SOLUSI LOGIN PERMANEN: SIMPAN COOKIE SAAT APLIKASI DIGESER / DITUTUP
+    // ================================================================
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            CookieManager.getInstance().flush();
+        }
     }
 
     private void setSystemBarColors() {
@@ -319,7 +334,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // PROSES EKSEKUSI BLUETOOTH PRINTER & DECODE LOGO
     private void kirimKePrinterBluetooth(final String dataDikirim) {
         final BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         if (bluetoothAdapter == null) {
