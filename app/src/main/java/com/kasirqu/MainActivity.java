@@ -51,6 +51,9 @@ public class MainActivity extends AppCompatActivity {
 
     // UUID standar untuk printer thermal Bluetooth (SPP)
     private static final UUID PRINTER_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+    
+    // URL APLIKASI (Tambahkan ?app=1 di akhir untuk memicu cookie dari PHP)
+    private static final String APP_URL = "https://curva.web.id/kasir-app/?app=1";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -143,10 +146,24 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setSaveFormData(false);
         webSettings.setSavePassword(false);
 
-        CookieManager.getInstance().setAcceptCookie(true);
+        // =====================================================================
+        // ✨ SUNTIKKAN CUSTOM USER-AGENT AGAR DIKENALI OLEH SISTEM PHP
+        // =====================================================================
+        String defaultUA = webSettings.getUserAgentString();
+        // Kita tambahkan string "KasirQuApp" di akhir User-Agent
+        webSettings.setUserAgentString(defaultUA + " KasirQuApp");
+
+        // =====================================================================
+        // ✨ SET COOKIE SECARA MANUAL SAAT APLIKASI DIBUKA
+        // =====================================================================
+        CookieManager cookieManager = CookieManager.getInstance();
+        cookieManager.setAcceptCookie(true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
+            cookieManager.setAcceptThirdPartyCookies(webView, true);
         }
+        // Paksa set cookie 'kasir_app=1' agar PHP meloloskan akses
+        cookieManager.setCookie("https://curva.web.id", "kasir_app=1; Max-Age=31536000; Path=/");
+        cookieManager.flush();
 
         webView.addJavascriptInterface(new WebAppInterface(), "Android");
 
@@ -228,7 +245,8 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        webView.loadUrl("https://curva.web.id/kasir-app/");
+        // Muat URL dengan parameter ?app=1
+        webView.loadUrl(APP_URL);
     }
 
     // ================================================================
